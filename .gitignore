@@ -1,0 +1,32 @@
+# Rust
+/target/
+Cargo.lock
+
+# Data files
+*.csv
+*.tsv
+*.parquet
+*.bin
+*.dat
+data/
+
+# Model weights / checkpoints
+*.pt
+*.pth
+*.onnx
+weights/
+checkpoints/
+models/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
