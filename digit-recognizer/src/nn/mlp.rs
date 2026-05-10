@@ -1,5 +1,6 @@
 use rand::prelude::*;
-use std::fmt::{Display, Formatter};
+use std::{fmt::{Display, Formatter}, vec};
+use crate::nn::utils::*;
 
 pub struct Layer {
     // this structure represents a single layer of the network
@@ -125,12 +126,72 @@ impl Network {
 
             // add biases vector
             let z = add_vectors(&weights_by_prev, biases);
-
-            for j in 0..z.len() {
-                // fill in calculated values to the next layer, after "sigmoid-ifying" them
-                self.layers[i + 1].activations[j] = sigmoid(z[j]);
+            
+            if i != self.connections.len() - 1 {
+                for j in 0..z.len() {
+                    // fill in calculated values to the next layer, after "sigmoid-ifying" them
+                    self.layers[i + 1].activations[j] = sigmoid(z[j]);
+                }
+            }
+            else {
+                // if its last layer, softmax calculated values
+                self.layers[i + 1].activations = softmax(&z)
             }
         }
+    }
+
+    pub fn backpropagation(&mut self, output: usize, lr: f32) {
+        // gradient descent on connection parameters
+
+        let n = self.layers.len();
+
+        let mut logit_deriv: Vec<f32> = xentropy_grad(&self.layers[n - 1].activations, output);
+
+        for i in (0..n - 1).rev() {
+            let weights = &mut self.connections[i].weights;
+            let previous_activations = &self.layers[i].activations;
+
+            let weights_deriv = vec_by_vec_transposed(&logit_deriv, previous_activations);
+            let biases_deriv= logit_deriv.clone();
+
+            if i > 0 {
+                logit_deriv = vec_mul(&matrix_by_vector(&transpose(weights), &logit_deriv), &sigmoid_derivative(previous_activations));
+            }
+
+            gradient_descent(weights, weights_deriv, lr);
+            
+            let biases = &mut self.connections[i].biases;
+            gradient_descent_vector(biases, biases_deriv, lr);
+        }
+    }
+
+    pub fn learn(&mut self, input: Vec<f32>, output: usize, lr: f32) {
+        // learning step for neural network
+
+        self.set_initial_layer(input);
+        self.feedforward();
+        self.backpropagation(output, lr);
+    }
+
+    pub fn predict(&mut self, input: Vec<f32>) -> u8 {
+        // prediction of neural network
+
+        self.set_initial_layer(input);
+        self.feedforward();
+        
+        let output_layer = self.layers.last().unwrap();
+        let mut label = 0_u8;
+        let mut max = -1_f32;
+
+        for i in 0..output_layer.activations.len() {
+            let val = output_layer.activations[i];
+            if val > max {
+                label = i as u8;
+                max = val;
+            }
+        }
+
+        return label;
     }
 }
 
@@ -147,50 +208,4 @@ impl Display for Network {
 
         Ok(())
     }
-}
-
-fn sigmoid(x: f32) -> f32 {
-    // sigmoid function to "squish" values into the [0, 1] range
-    1.0 / (1.0 + (-x).exp())
-}
-
-pub fn matrix_by_vector(m: &Vec<Vec<f32>>, v: &Vec<f32>) -> Vec<f32> {
-    // multiply matrix M by vector V
-    // M: n x p; V: p x 1
-    // n - next, p - prev
-
-    let p = m[0].len();
-    let n = m.len();
-
-    assert_eq!(p, v.len(), "Wrong matrix/vector size!");
-
-    let mut result = Vec::<f32>::new();
-
-    for i in 0..n {
-        let mut element = 0.0;
-
-        for j in 0..p {
-            element += m[i][j] * v[j];
-        }
-
-        result.push(element);
-    }
-
-    result
-}
-
-pub fn add_vectors(u: &Vec<f32>, v: &Vec<f32>) -> Vec<f32> {
-    // add vectors U and V
-
-    let n = u.len();
-
-    assert_eq!(n, v.len(), "Vectors must have the same length!");
-
-    let mut result = Vec::<f32>::new();
-
-    for i in 0..n {
-        result.push(u[i] + v[i]);
-    }
-    
-    result
 }
