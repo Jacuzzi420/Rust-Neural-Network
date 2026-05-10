@@ -145,17 +145,17 @@ impl Network {
 
         let n = self.layers.len();
 
-        let mut logit_deriv: Vec<f32> = xentropy_grad(&self.layers[n - 1].activations, output);
+        let mut layer_deriv: Vec<f32> = xentropy_grad(&self.layers[n - 1].activations, output);
 
         for i in (0..n - 1).rev() {
             let weights = &mut self.connections[i].weights;
             let previous_activations = &self.layers[i].activations;
 
-            let weights_deriv = vec_by_vec_transposed(&logit_deriv, previous_activations);
-            let biases_deriv= logit_deriv.clone();
+            let weights_deriv = vec_by_vec_transposed(&layer_deriv, previous_activations);
+            let biases_deriv = layer_deriv.clone();
 
             if i > 0 {
-                logit_deriv = vec_mul(&matrix_by_vector(&transpose(weights), &logit_deriv), &sigmoid_derivative(previous_activations));
+                layer_deriv = vec_mul(&matrix_by_vector(&transpose(weights), &layer_deriv), &sigmoid_derivative(previous_activations));
             }
 
             gradient_descent(weights, weights_deriv, lr);
