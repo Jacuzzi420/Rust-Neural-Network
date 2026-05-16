@@ -12,19 +12,35 @@ fn main() {
         "mnist/t10k-labels.idx1-ubyte",
     ).expect("Failed to load MNIST training_data");
 
-    println!("Loaded {} training images", training_data.images.len());
+    let n = training_data.images.len();
+    println!("Loaded {} training images", n);
     println!("First image label: {}", training_data.labels[0]);
 
-    let mut network = nn::mlp::Network::new(vec![784, 16, 16, 10]);
+    let mut network = nn::mlp::Network::new(vec![784, 32, 32, 10]);
 
-    let epochs = 20;
+    let epochs = 10;
+    let lr = 3.0;
+    let batch_size = 10;
 
     for e in 0..epochs {
         println!("Epoch {} started", e);
         let now = Instant::now();
+        let shuffled = nn::utils::shuffle(n);
+        let mut k = 0;
 
-        for i in 0..training_data.images.len() {
-            network.learn(training_data.images[i].clone(), training_data.labels[i] as usize, 0.1);
+        while k + batch_size <= n {
+            // new iteration - new batch
+            let mut batch_images = Vec::new();
+            let mut batch_labels = Vec::new();
+            
+            for i in k..k+batch_size {
+                let idx = shuffled[i];
+                batch_images.push(training_data.images[idx].clone());
+                batch_labels.push(training_data.labels[idx] as usize);
+            }
+
+            network.learn_on_batch(batch_images, batch_labels, lr);
+            k += batch_size;
         }
 
 

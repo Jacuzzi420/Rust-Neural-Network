@@ -140,12 +140,15 @@ impl Network {
         }
     }
 
-    pub fn backpropagation(&mut self, output: usize, lr: f32) {
-        // gradient descent on connection parameters
+    pub fn backpropagation(&mut self, output: usize) -> (Vec<Vec<Vec<f32>>>, Vec<Vec<f32>>) {
+        // returns gradient on connection parameters
 
         let n = self.layers.len();
 
         let mut layer_deriv: Vec<f32> = xentropy_grad(&self.layers[n - 1].activations, output);
+
+        let mut weights_derivs = Vec::new();
+        let mut biases_derivs = Vec::new();
 
         for i in (0..n - 1).rev() {
             let weights = &mut self.connections[i].weights;
@@ -153,24 +156,61 @@ impl Network {
 
             let weights_deriv = vec_by_vec_transposed(&layer_deriv, previous_activations);
             let biases_deriv = layer_deriv.clone();
-
+            
             if i > 0 {
                 layer_deriv = vec_mul(&matrix_by_vector(&transpose(weights), &layer_deriv), &sigmoid_derivative(previous_activations));
             }
 
-            gradient_descent(weights, weights_deriv, lr);
+            //gradient_descent(weights, weights_deriv, lr);
+            weights_derivs.push(weights_deriv);
             
-            let biases = &mut self.connections[i].biases;
-            gradient_descent_vector(biases, biases_deriv, lr);
+            //let biases = &mut self.connections[i].biases;
+            //gradient_descent_vector(biases, biases_deriv, lr);
+            biases_derivs.push(biases_deriv);
         }
+
+        weights_derivs.reverse();
+        biases_derivs.reverse();
+
+        (weights_derivs, biases_derivs)
     }
 
-    pub fn learn(&mut self, input: Vec<f32>, output: usize, lr: f32) {
+    pub fn learn(&mut self, input: Vec<f32>, output: usize) -> (Vec<Vec<Vec<f32>>>, Vec<Vec<f32>>) {
         // learning step for neural network
 
         self.set_initial_layer(input);
         self.feedforward();
-        self.backpropagation(output, lr);
+        self.backpropagation(output)
+    }
+
+    pub fn learn_on_batch(&mut self, inputs: Vec<Vec<f32>>, outputs: Vec<usize>, lr: f32) {
+        let n = inputs.len();
+
+        let mut batch_weights_derivs =Vec::<Vec<Vec<f32>>>::new();
+        let mut batch_biases_derivs = Vec::<Vec<f32>>::new();
+
+        for i in 0..n {
+            let derivs = self.learn(inputs[i].clone(), outputs[i]);
+            let weights_derivs = derivs.0;
+            let biases_derivs = derivs.1;
+
+            if i == 0 {
+                batch_weights_derivs = weights_derivs.clone();
+                batch_biases_derivs = biases_derivs.clone();
+            } 
+            else {
+                for l in 0..weights_derivs.len() {
+                    batch_weights_derivs[l] = add_matrices(&batch_weights_derivs[l], &weights_derivs[l]);
+                    batch_biases_derivs[l] = add_vectors(&batch_biases_derivs[l], &biases_derivs[l]);
+                }
+            }
+        }
+
+        let avg_lr = lr / n as f32;
+        for l in 0..self.connections.len() {
+            gradient_descent(&mut self.connections[l].weights, batch_weights_derivs[l].clone(), avg_lr);
+            gradient_descent_vector(&mut self.connections[l].biases, batch_biases_derivs[l].clone(), avg_lr);
+        }
     }
 
     pub fn predict(&mut self, input: Vec<f32>) -> u8 {

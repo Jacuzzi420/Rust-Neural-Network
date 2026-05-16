@@ -1,3 +1,5 @@
+use rand::prelude::*;
+
 pub fn sigmoid(x: f32) -> f32 {
     // sigmoid function to "squish" values into the [0, 1] range
     1.0 / (1.0 + (-x).exp())
@@ -175,6 +177,26 @@ pub fn add_vectors(u: &Vec<f32>, v: &Vec<f32>) -> Vec<f32> {
     result
 }
 
+pub fn add_matrices(a: &Vec<Vec<f32>>, b: &Vec<Vec<f32>>) -> Vec<Vec<f32>>{
+    // add matrices A and B
+    let n = a.len();
+    let m = a[0].len();
+
+    assert_eq!(n, b.len(), "Matrices must have the same size!");
+    assert_eq!(m, b[0].len(), "Matrices must have the same size!");
+
+    let mut result = vec![vec![0.0; m]; n];
+
+    for i in 0..n {
+        for j in 0..m {
+            result[i][j] += a[i][j];
+            result[i][j] += b[i][j];
+        }
+    }
+
+    result
+}
+
 pub fn vec_mul(v1: &Vec<f32>, v2: &Vec<f32>) -> Vec<f32> {
     // multiplies vector v1 by vector v2 elementwise
     // v1: n x 1; v2: n x 1
@@ -191,6 +213,27 @@ pub fn vec_mul(v1: &Vec<f32>, v2: &Vec<f32>) -> Vec<f32> {
 
     return result;
 }
+
+pub fn shuffle(n: usize) -> Vec<usize> {
+    // Fisher–Yates shuffle 
+    // returns a permutation of 0..n range
+
+    let mut rng = rand::rng();
+    let mut shuffled = Vec::new();
+
+    for i in 0..n {
+        shuffled.push(i);
+    }
+
+    for i in 0..n - 1 {
+        let j = rng.random_range(i..n);
+        shuffled.swap(i, j);
+    }
+
+    shuffled
+} 
+
+
 
 #[cfg(test)]
 mod tests {
