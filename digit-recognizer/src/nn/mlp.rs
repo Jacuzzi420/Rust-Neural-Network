@@ -143,15 +143,15 @@ impl Network {
             let weights = &mut self.connections[i].weights;
             let previous_activations = &self.layers[i].activations;
 
-            let weights_deriv = &layer_grad.mat_mul(&previous_activations.transpose());
-            let biases_deriv = layer_grad.clone();
+            let weights_grad = &layer_grad.mat_mul(&previous_activations.transpose());
+            let biases_grad = layer_grad.clone();
             
             if i > 0 {
                 layer_grad = weights.transpose().mat_mul(&layer_grad).mul(&sigmoid_grad(previous_activations));
             }
 
-            weights_grads.push(weights_deriv.clone());
-            biases_grads.push(biases_deriv.clone());
+            weights_grads.push(weights_grad.clone());
+            biases_grads.push(biases_grad.clone());
         }
 
         weights_grads.reverse();
