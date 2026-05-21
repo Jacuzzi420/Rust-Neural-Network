@@ -1,26 +1,26 @@
-use rand::prelude::*;
-use std::{fmt::{Display, Formatter}, vec};
-use crate::nn::utils::*;
+use std::{fmt::{Display, Formatter}};
+use crate::nn::math::matrix::*;
+use crate::nn::math::utils::*;
 
 pub struct Layer {
     // this structure represents a single layer of the network
 
-    pub activations: Vec<f32>
+    pub activations: Matrix,
 }
 
 impl Layer {
     pub fn new(size: usize) -> Layer {
-        Layer {activations: vec![0.0; size]}
+        Layer {activations: Matrix::zeros((size, 1))}
     }
 
     pub fn len(&self) -> usize {
-        self.activations.len()
+        self.activations.shape.0
     }
 }
 
 impl Display for Layer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}\n", self.activations)?;
+        write!(f, "{}\n", self.activations)?;
 
         Ok(())
     }
@@ -29,8 +29,8 @@ impl Display for Layer {
 pub struct Connection {
     // this structure represents the weights and biases between two layers of the network
 
-    pub weights: Vec<Vec<f32>>,
-    pub biases: Vec<f32>
+    pub weights: Matrix,
+    pub biases: Matrix,
 }
 
 impl Connection {
@@ -39,17 +39,9 @@ impl Connection {
         // weights are initialized randomly, using Xavier weight initialization approach
         // biases are set to zero
 
-        let mut rng = rand::rng();
-        let mut weights = vec![vec![0.0; prev]; next]; 
         let limit = (6.0 / (prev + next) as f32).sqrt(); // Xavier weight initialization
-
-        for i in 0..next {
-            for j in 0..prev {
-                weights[i][j] = rng.random_range(-limit..limit);
-            }
-        }
-
-        let biases = vec![0.0; next];
+        let weights = Matrix::rand((next, prev), -limit, limit);
+        let biases = Matrix::zeros((next, 1));
         Connection { weights, biases }
     }
 }
@@ -57,12 +49,10 @@ impl Connection {
 impl Display for Connection {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Weights:\n")?;
-        for i in 0..self.weights.len() {
-            write!(f, " {:?}\n", self.weights[i])?;
-        }
+        write!(f, "{}\n", self.weights)?;
 
         write!(f, " Biases:\n")?;
-        write!(f, " {:?}\n", self.biases)?;
+        write!(f, " {}\n", self.biases)?;
 
         Ok(())
     }
@@ -110,7 +100,7 @@ impl Network {
             assert!(0.0 <= input[i] && input[i] <= 1.0, "Activation values must be in [0, 1] range!");
         }
 
-        self.layers[0].activations = input;
+        self.layers[0].activations = Matrix::new((input.len(), 1), input);
     }
 
     pub fn feedforward(&mut self) {
@@ -122,94 +112,96 @@ impl Network {
             let biases =  &self.connections[i].biases;
 
             // multiply weight matrix by activation vector
-            let weights_by_prev = matrix_by_vector(weights,previous_layer);
+            let weights_by_prev = weights.mat_mul(previous_layer);
 
             // add biases vector
-            let z = add_vectors(&weights_by_prev, biases);
+            let z = weights_by_prev.add(biases);
             
             if i != self.connections.len() - 1 {
-                for j in 0..z.len() {
-                    // fill in calculated values to the next layer, after "sigmoid-ifying" them
-                    self.layers[i + 1].activations[j] = sigmoid(z[j]);
-                }
+                // fill in calculated values to the next layer, after "sigmoid-ifying" them
+                self.layers[i + 1].activations = mat_sigmoid(z);
             }
             else {
                 // if its last layer, softmax calculated values
-                self.layers[i + 1].activations = softmax(&z)
+                self.layers[i + 1].activations = mat_softmax(z);
             }
         }
     }
 
-    pub fn backpropagation(&mut self, output: usize) -> (Vec<Vec<Vec<f32>>>, Vec<Vec<f32>>) {
-        // returns gradient on connection parameters
+    pub fn backpropagation(&mut self, output: usize) -> (Vec<Matrix>, Vec<Matrix>) {
+        // backpropagation step for neural network
 
         let n = self.layers.len();
+        let activations = &self.layers[n - 1].activations;
 
-        let mut layer_deriv: Vec<f32> = xentropy_grad(&self.layers[n - 1].activations, output);
+        let mut layer_grad = xentropy_grad(activations, output);
 
-        let mut weights_derivs = Vec::new();
-        let mut biases_derivs = Vec::new();
+        let mut weights_grads: Vec<Matrix> = Vec::new();
+        let mut biases_grads: Vec<Matrix> = Vec::new();
 
         for i in (0..n - 1).rev() {
             let weights = &mut self.connections[i].weights;
             let previous_activations = &self.layers[i].activations;
 
-            let weights_deriv = vec_by_vec_transposed(&layer_deriv, previous_activations);
-            let biases_deriv = layer_deriv.clone();
+            let weights_deriv = &layer_grad.mat_mul(&previous_activations.transpose());
+            let biases_deriv = layer_grad.clone();
             
             if i > 0 {
-                layer_deriv = vec_mul(&matrix_by_vector(&transpose(weights), &layer_deriv), &sigmoid_derivative(previous_activations));
+                layer_grad = weights.transpose().mat_mul(&layer_grad).mul(&sigmoid_grad(previous_activations));
             }
 
-            //gradient_descent(weights, weights_deriv, lr);
-            weights_derivs.push(weights_deriv);
-            
-            //let biases = &mut self.connections[i].biases;
-            //gradient_descent_vector(biases, biases_deriv, lr);
-            biases_derivs.push(biases_deriv);
+            weights_grads.push(weights_deriv.clone());
+            biases_grads.push(biases_deriv.clone());
         }
 
-        weights_derivs.reverse();
-        biases_derivs.reverse();
+        weights_grads.reverse();
+        biases_grads.reverse();
 
-        (weights_derivs, biases_derivs)
+        (weights_grads, biases_grads)
     }
 
-    pub fn learn(&mut self, input: Vec<f32>, output: usize) -> (Vec<Vec<Vec<f32>>>, Vec<Vec<f32>>) {
-        // learning step for neural network
+    pub fn get_gradient(&mut self, input: Vec<f32>, output: usize) -> (Vec<Matrix>, Vec<Matrix>) {
+        // calculates gradient for given input and output
 
         self.set_initial_layer(input);
         self.feedforward();
         self.backpropagation(output)
     }
 
+    pub fn learn(&mut self, input: Vec<f32>, output: usize, lr: f32) {
+        let (weights_grads, biases_grads) = self.get_gradient(input.clone(), output);
+    
+        for i in 0..self.connections.len() {
+            self.connections[i].weights = gradient_descent(&self.connections[i].weights, &weights_grads[i], lr);
+            self.connections[i].biases = gradient_descent(&self.connections[i].biases, &biases_grads[i], lr);
+        }
+    }
+
     pub fn learn_on_batch(&mut self, inputs: Vec<Vec<f32>>, outputs: Vec<usize>, lr: f32) {
         let n = inputs.len();
 
-        let mut batch_weights_derivs =Vec::<Vec<Vec<f32>>>::new();
-        let mut batch_biases_derivs = Vec::<Vec<f32>>::new();
+        let mut batch_weights_grads =Vec::<Matrix>::new();
+        let mut batch_biases_grads = Vec::<Matrix>::new();
 
         for i in 0..n {
-            let derivs = self.learn(inputs[i].clone(), outputs[i]);
-            let weights_derivs = derivs.0;
-            let biases_derivs = derivs.1;
+            let (weights_grads, biases_grads) = self.get_gradient(inputs[i].clone(), outputs[i]);
 
             if i == 0 {
-                batch_weights_derivs = weights_derivs.clone();
-                batch_biases_derivs = biases_derivs.clone();
+                batch_weights_grads = weights_grads.clone();
+                batch_biases_grads = biases_grads.clone();
             } 
             else {
-                for l in 0..weights_derivs.len() {
-                    batch_weights_derivs[l] = add_matrices(&batch_weights_derivs[l], &weights_derivs[l]);
-                    batch_biases_derivs[l] = add_vectors(&batch_biases_derivs[l], &biases_derivs[l]);
+                for l in 0..weights_grads.len() {
+                    batch_weights_grads[l] = batch_weights_grads[l].add(&weights_grads[l]);
+                    batch_biases_grads[l] = batch_biases_grads[l].add(&biases_grads[l]);
                 }
             }
         }
 
         let avg_lr = lr / n as f32;
         for l in 0..self.connections.len() {
-            gradient_descent(&mut self.connections[l].weights, batch_weights_derivs[l].clone(), avg_lr);
-            gradient_descent_vector(&mut self.connections[l].biases, batch_biases_derivs[l].clone(), avg_lr);
+            self.connections[l].weights = gradient_descent(&self.connections[l].weights, &batch_weights_grads[l], avg_lr);
+            self.connections[l].biases = gradient_descent(&self.connections[l].biases, &batch_biases_grads[l], avg_lr);
         }
     }
 
@@ -220,18 +212,18 @@ impl Network {
         self.feedforward();
         
         let output_layer = self.layers.last().unwrap();
-        let mut label = 0_u8;
-        let mut max = -1_f32;
+        let mut label = 0;
+        let mut max = -1.;
 
-        for i in 0..output_layer.activations.len() {
-            let val = output_layer.activations[i];
+        for i in 0..output_layer.activations.shape.0 {
+            let val = output_layer.activations[(i, 0)];
             if val > max {
-                label = i as u8;
+                label = i;
                 max = val;
             }
         }
 
-        return label;
+        label as u8
     }
 }
 

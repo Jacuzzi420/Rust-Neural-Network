@@ -25,7 +25,7 @@ fn main() {
     for e in 0..epochs {
         println!("Epoch {} started", e);
         let now = Instant::now();
-        let shuffled = nn::utils::shuffle(n);
+        let shuffled = nn::math::utils::shuffle(n);
         let mut k = 0;
 
         while k + batch_size <= n {
