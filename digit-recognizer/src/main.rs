@@ -20,7 +20,7 @@ fn main() {
     println!("First image label: {}", training_data.labels[0]);
 
 
-    let mut network = nn::mlp::Network::new_custom(vec![784, 32, 32, 10], vec![Activation::ReLU, Activation::ReLU], Classification::Sigmoid);
+    let mut network = nn::mlp::Network::new_custom(vec![784, 32, 32, 10], vec![Activation::ReLU, Activation::ReLU], Classification::Softmax);
 
     let epochs = 10;
     let lr = 0.005;

@@ -31,7 +31,6 @@ impl Activation {
 pub enum Classification {
     Softmax,
     Sigmoid,
-    Nothing,
 }
 
 impl Classification {
@@ -39,7 +38,6 @@ impl Classification {
         match self {
             Classification::Softmax => mat_softmax(z),
             Classification::Sigmoid => mat_sigmoid(z),
-            Classification::Nothing => z,
         }
     }
 }

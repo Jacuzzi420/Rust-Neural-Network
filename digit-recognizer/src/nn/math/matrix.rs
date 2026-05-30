@@ -1,8 +1,8 @@
 use rand::prelude::*;
 use std::ops::{Index, IndexMut};
 use std::{fmt::{Display, Formatter}};
+use std::ops::{Add, Mul};
 
-// TODO: Zamień na funkcje na operatory
 #[derive(Clone)]
 pub struct Matrix {
     pub shape: (usize, usize),
@@ -153,6 +153,30 @@ impl IndexMut<(usize, usize)> for Matrix {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         let (x, y) = index;
         &mut self.data[x * self.shape.1 + y]
+    }
+}
+
+impl Add<&Matrix> for &Matrix {
+    type Output = Matrix;
+
+    fn add(self, other: &Matrix) -> Matrix {
+        self.add(other)
+    }
+}
+
+impl Mul<&Matrix> for &Matrix {
+    type Output = Matrix;
+
+    fn mul(self, other: &Matrix) -> Matrix {
+        self.mul(other)
+    }
+}
+
+impl Mul<f32> for &Matrix {
+    type Output = Matrix;
+
+    fn mul(self, scalar: f32) -> Matrix {
+        self.scalar_mul(scalar)
     }
 }
 
