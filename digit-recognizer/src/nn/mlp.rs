@@ -27,6 +27,23 @@ impl Activation {
         }
     }
 }
+
+pub enum Classification {
+    Softmax,
+    Sigmoid,
+    Nothing,
+}
+
+impl Classification {
+    pub fn apply(&self, z: Matrix) -> Matrix {
+        match self {
+            Classification::Softmax => mat_softmax(z),
+            Classification::Sigmoid => mat_sigmoid(z),
+            Classification::Nothing => z,
+        }
+    }
+}
+
 pub struct Layer {
     // this structure represents a single layer of the network
 
@@ -95,7 +112,8 @@ pub struct Network {
     // consisting of N layers and N - 1 connections
 
     pub layers: Vec<Layer>,
-    pub connections: Vec<Connection>
+    pub connections: Vec<Connection>,
+    pub classification: Classification,
 }
 
 impl Network {
@@ -121,14 +139,16 @@ impl Network {
             connections.push(connection);
         }
 
-        Network { layers, connections }
+        let classification = Classification::Softmax;
+
+        Network { layers, connections, classification }
     }
 
-    pub fn new_custom(sizes: Vec<usize>, mut activation_types: Vec<Activation>) -> Network {
-        // create new neural network with custom activation functions
-        // for example, Network::new([4, 3, 3, 2], [ReLU, Sigmoid]) will create a network with four layers
+    pub fn new_custom(sizes: Vec<usize>, mut activation_types: Vec<Activation>, classification: Classification) -> Network {
+        // create new neural network with custom activation functions and classification
+        // for example, Network::new([4, 3, 3, 2], [ReLU, Sigmoid], Softmax) will create a network with four layers
         // 2nd layer will have ReLU as its activation function, 3rd layer will have Sigmoid
-        // activation functions do not apply to first and last layers
+        // last layer will use softmax classification
 
         if sizes.len() != activation_types.len() + 2 {
             panic!("Wrong activation_types size");
@@ -153,7 +173,7 @@ impl Network {
             connections.push(connection);
         }
 
-        Network { layers, connections }
+        Network { layers, connections, classification }
     }
 
     pub fn set_initial_layer(&mut self, input: Vec<f32>) {
@@ -185,8 +205,7 @@ impl Network {
                 self.layers[i + 1].activations = self.layers[i + 1].activation_type.apply(z);
             }
             else {
-                // last layer always uses softmax
-                self.layers[i + 1].activations = mat_softmax(z);
+                self.layers[i + 1].activations = self.classification.apply(z);
             }
         }
     }
