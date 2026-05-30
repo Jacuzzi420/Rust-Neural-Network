@@ -1,7 +1,26 @@
 use crate::nn::math::matrix::*;
 use rand::prelude::*;
 
-// TODO: Dodaj relu i sigmoid na output
+
+
+pub fn relu(x: f32) -> f32 {
+    if x < 0.0 { 0.0 }
+    else { x }
+}
+
+pub fn relu_grad(s: &Matrix) -> Matrix {
+    let mut result = Matrix::zeros(s.shape);
+
+    for i in 0..result.shape.0 {
+        for j in 0..result.shape.1 {
+            if s[(i, j)] < 0.0 { result[(i, j)] = 0.0 }
+            else { result[(i, j)] = 1.0 }
+        }
+    }
+
+    result
+}
+
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
 }
@@ -42,6 +61,16 @@ pub fn xentropy_grad(s: &Matrix, t: usize) -> Matrix {
     result[(t, 0)] -= 1.;
 
     result
+}
+
+pub fn mat_relu(mut matrix: Matrix) -> Matrix {
+    for i in 0..matrix.shape.0 {
+        for j in 0..matrix.shape.1 {
+            matrix[(i, j)] = relu(matrix[(i, j)]);
+        }
+    }
+
+    matrix
 }
 
 pub fn mat_sigmoid(mut matrix: Matrix) -> Matrix {

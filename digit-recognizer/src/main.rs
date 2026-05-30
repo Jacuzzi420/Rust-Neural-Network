@@ -1,6 +1,8 @@
 mod nn;
 mod data;
 use std::time::Instant;
+
+use crate::nn::mlp::Activation;
 fn main() {
     let training_data = data::mnist::load_mnist(
         "mnist/train-images.idx3-ubyte",
@@ -16,11 +18,21 @@ fn main() {
     println!("Loaded {} training images", n);
     println!("First image label: {}", training_data.labels[0]);
 
+
+    let mut network = nn::mlp::Network::new_custom(vec![784, 32, 32, 10], vec![Activation::ReLU, Activation::ReLU]);
+
+    let epochs = 10;
+    let lr = 0.005;
+    let batch_size = 10;
+
+    
+    /* 
     let mut network = nn::mlp::Network::new(vec![784, 32, 32, 10]);
 
     let epochs = 10;
-    let lr = 3.0;
+    let lr = 1.0;
     let batch_size = 10;
+    */
 
     for e in 0..epochs {
         println!("Epoch {} started", e);

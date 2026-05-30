@@ -22,6 +22,13 @@ impl Matrix {
         Matrix { shape, data }
     }
 
+    pub fn ones(shape: (usize, usize)) -> Matrix {
+        assert_ne!(shape.0 * shape.1, 0);
+
+        let data = vec![1.0; shape.0 * shape.1];
+        Matrix { shape, data }
+    }
+
     pub fn rand(shape: (usize, usize), low: f32, high: f32) -> Matrix {
         assert_ne!(shape.0 * shape.1, 0);
 

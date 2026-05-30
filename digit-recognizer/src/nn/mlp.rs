@@ -2,15 +2,47 @@ use std::{fmt::{Display, Formatter}};
 use crate::nn::math::matrix::*;
 use crate::nn::math::utils::*;
 
+#[derive(Clone)]
+#[derive(PartialEq)]
+pub enum Activation {
+    ReLU,
+    Sigmoid,
+    Nothing,
+}
+
+impl Activation {
+    pub fn apply(&self, z: Matrix) -> Matrix {
+        match self {
+            Activation::ReLU => mat_relu(z),
+            Activation::Sigmoid => mat_sigmoid(z),
+            Activation::Nothing => z,
+        }
+    }
+
+    pub fn grad(&self, activations: &Matrix) -> Matrix {
+        match self {
+            Activation::ReLU => relu_grad(activations),
+            Activation::Sigmoid => sigmoid_grad(activations),
+            Activation::Nothing => Matrix::ones(activations.shape),
+        }
+    }
+}
 pub struct Layer {
     // this structure represents a single layer of the network
 
     pub activations: Matrix,
+    pub activation_type: Activation,
 }
 
 impl Layer {
     pub fn new(size: usize) -> Layer {
-        Layer {activations: Matrix::zeros((size, 1))}
+        // create layer with sigmoid as activation function
+        Layer {activations: Matrix::zeros((size, 1)), activation_type: Activation::Sigmoid}
+    }
+
+    pub fn new_custom(size: usize, activation_type: Activation) -> Layer {
+        // create layer with custom activation function
+        Layer {activations: Matrix::zeros((size, 1)), activation_type: activation_type}
     }
 
     pub fn len(&self) -> usize {
@@ -68,7 +100,7 @@ pub struct Network {
 
 impl Network {
     pub fn new(sizes: Vec<usize>) -> Network {
-        // create new neural network
+        // create new neural network with sigmoid activation function
         // for example, Network::new([4, 3, 3, 2]) will create a network with four layers
         // 1st layer will have 4 neurons, 2nd - 3, 3rd - 3, 4th - 2
         // weights are initialized randomly, biases are set to 0
@@ -78,6 +110,38 @@ impl Network {
         for i in 0..sizes.len() {
             // create sizes.len() layers
             let layer = Layer::new(sizes[i]);
+            layers.push(layer);
+        }
+
+        let mut connections = Vec::new();
+
+        for i in 0..sizes.len()-1 {
+            // create sizes.len() - 1 connections
+            let connection = Connection::new(sizes[i], sizes[i + 1]);
+            connections.push(connection);
+        }
+
+        Network { layers, connections }
+    }
+
+    pub fn new_custom(sizes: Vec<usize>, mut activation_types: Vec<Activation>) -> Network {
+        // create new neural network with custom activation functions
+        // for example, Network::new([4, 3, 3, 2], [ReLU, Sigmoid]) will create a network with four layers
+        // 2nd layer will have ReLU as its activation function, 3rd layer will have Sigmoid
+        // activation functions do not apply to first and last layers
+
+        if sizes.len() != activation_types.len() + 2 {
+            panic!("Wrong activation_types size");
+        }
+
+        let mut layers = Vec::new();
+
+        activation_types.insert(0, Activation::Nothing);
+        activation_types.push(Activation::Nothing);
+        
+        for i in 0..sizes.len() {
+            // create sizes.len() layers
+            let layer = Layer::new_custom(sizes[i], activation_types[i].clone());
             layers.push(layer);
         }
 
@@ -118,11 +182,10 @@ impl Network {
             let z = weights_by_prev.add(biases);
             
             if i != self.connections.len() - 1 {
-                // fill in calculated values to the next layer, after "sigmoid-ifying" them
-                self.layers[i + 1].activations = mat_sigmoid(z);
+                self.layers[i + 1].activations = self.layers[i + 1].activation_type.apply(z);
             }
             else {
-                // if its last layer, softmax calculated values
+                // last layer always uses softmax
                 self.layers[i + 1].activations = mat_softmax(z);
             }
         }
@@ -147,7 +210,9 @@ impl Network {
             let biases_grad = layer_grad.clone();
             
             if i > 0 {
-                layer_grad = weights.transpose().mat_mul(&layer_grad).mul(&sigmoid_grad(previous_activations));
+                layer_grad = weights.transpose()
+                                    .mat_mul(&layer_grad)
+                                    .mul(&self.layers[i].activation_type.grad(previous_activations));
             }
 
             weights_grads.push(weights_grad.clone());
