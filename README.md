@@ -7,8 +7,7 @@ A neural network library for digit classification built in pure Rust. Educationa
 - **Activation Functions**: ReLU, Sigmoid
 - **Classification**: Softmax
 - **Training**: Backpropagation with mini-batch stochastic gradient descent
-- **Weight Initialization**: Xavier initialization
-- **MNIST Dataset**: Full training and evaluation pipeline
+- **MNIST Dataset**: Full training and evaluation
 
 ## Project Structure
 
@@ -46,7 +45,3 @@ The default configuration:
 - Hidden layers: 32 neurons (ReLU), 32 neurons (ReLU)
 - Output layer: 10 neurons (Softmax for classification)
 - Training: 10 epochs, learning rate 0.005, batch size 10
-
-## License
-
-MIT
